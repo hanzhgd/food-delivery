@@ -4,61 +4,54 @@
 
 rm(list = ls())
 
-working_directory <- "~/Documents/researches/air_pollution_meal_delivery/projectfiles/"
-setwd(working_directory)
-library(tidyr)
-library(readxl)
-library(dplyr)
-library(lubridate)
-library(ggplot2)
+if (!require(pacman)) install.packages("pacman")
+pacman::p_load(tidyverse, readxl, lubridate)
 
-# load df data
-jul1 <- read_xlsx(paste0(working_directory, "./data/rawdata/Jul_C3_P1.xlsx"))
-jul2 <- read_xlsx(paste0(working_directory, "./data/rawdata/Jul_C3_P2.xlsx"))
-aug1 <- read_xlsx(paste0(working_directory, "/data/rawdata/Aug_C3_P1.xlsx"))
-aug2 <- read_xlsx(paste0(working_directory, "/data/rawdata/Aug_C3_P2.xlsx"))
-df <- rbind(jul1, jul2, aug1, aug2)
+# load julaug data
+jul1 <- read_xlsx(here("data/rawdata/Jul_C3_P1.xlsx")) %>% as_tibble() %>%
+  select(-mobile)
+jul2 <- read_xlsx(here("data/rawdata/Jul_C3_P2.xlsx")) %>% as_tibble() %>%
+  select(-mobile)
+aug1 <- read_xlsx(here("data/rawdata/Aug_C3_P1.xlsx")) %>% as_tibble() %>%
+  select(-mobile)
+aug2 <- read_xlsx(here("data/rawdata/Aug_C3_P2.xlsx")) %>% as_tibble() %>%
+  select(-mobile)
+julaug <- bind_rows(jul1, jul2, aug1, aug2)
 
 # Basic Manipulation -----------
-str(df)
+julaug
 
-# pattern: 776 rider serves for the delivery from 3637 suppliers to 92582 users
-nrow(df)
+# pattern: 762 rider serves for the delivery from 3637 suppliers to 92582 users
+nrow(julaug)
 # > 411404
-n_distinct(df$user_id)
-# > 92852
-n_distinct(df$sup_id)
-# > 2830
-n_distinct(df$from_addr)
-# > 3637
-n_distinct(df$rider_id)
-# > 762
+julaug %>% summarise(n_distinct(user_id), 
+                     n_distinct(sup_id), 
+                     n_distinct(from_addr),
+                     n_distinct(rider_id))
 
-# generate new var
-df %<>% 
+# generate new var: datetime information, and breakdown of delivery time
+julaug <- julaug %>% 
   filter(!is.na(read_tm)) %>%
-  mutate(date = as.Date(read_tm), 
+  mutate(date = as.Date(read_tm),
+         weekday = weekdays(read_tm),
+         hour = hour(read_tm),
+         day = day(read_tm),
          read_to_finish_secs = as.numeric(finish_tm - read_tm), 
          read_to_finish_min = read_to_finish_secs / 60,
-         readtoarr = as.numeric(arrive_tm - read_tm) / 60,
-         arrtoleave =  as.numeric(leave_tm - arrive_tm) / 60,
-         leavetofinish =  as.numeric(finish_tm - leave_tm) / 60)
-# generate some datetime information
-df$weekday <- weekdays(df$read_tm)
-df$hour <- hour(df$dipatch_tm)
-df$day <- day(df$read_tm)
-df$date <- date(df$read_tm)
+         read_to_arr = as.numeric(arrive_tm - read_tm) / 60,
+         arr_to_leave =  as.numeric(leave_tm - arrive_tm) / 60,
+         leave_to_finish =  as.numeric(finish_tm - leave_tm) / 60)
 
 # a premium order: income > 500
-df$premium_ord <- df$rider_income > 500
+julaug$premium_ord <- julaug$rider_income > 500
 
 # a surge order: delivered during 10:00 to 14:00 or 17:00 to 20:00
-df$surge_ord <- (df$hour < 20 & df$hour > 17) | (df$hour < 14 & df$hour > 10)
-summary(df$surge_ord)
+julaug$surge_ord <- (julaug$hour < 20 & julaug$hour > 17) | (julaug$hour < 14 & julaug$hour > 10)
+summary(julaug$surge_ord)
 
 # late_order
-df$late <- df$receive_tm > df$require_tm # NOTICE: many NA's
+julaug$late <- julaug$receive_tm > julaug$require_tm # NOTICE: many NA's
 
 # save data
-save(df, file="./data/intdata/df.Rdata")
-summary(df)
+save(julaug, file=here("data/intdata/julaug.Rdata"))
+summary(julaug)
