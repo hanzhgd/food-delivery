@@ -55,3 +55,18 @@ julaug$late <- julaug$receive_tm > julaug$require_tm # NOTICE: many NA's
 # save data
 save(julaug, file=here("data/intdata/julaug.Rdata"))
 summary(julaug)
+
+df <- julaug
+df %>% group_by(rider_id) %>% arrange(date) %>% 
+  summarise(ndate = n_distinct(date)) %>%
+  ggplot(aes(x = ndate)) + geom_histogram(binwidth = 5)
+
+df %>% group_by(rider_id) %>% arrange(date) %>% 
+  summarise(firstdate = first(date),
+            ndate = n_distinct(date)) %>%
+  ggplot(aes(x = firstdate, y = ndate)) + geom_point()
+
+df %>% group_by(rider_id, hour) %>% arrange(date) %>% 
+  mutate(income_hr = sum(rider_income, na.rm = T)) %>%
+  summarise(mean_inc_hr = mean(income_hr, na.rm =T)) %>%
+  ggplot(aes(x = mean_inc_hr)) + geom_histogram()
